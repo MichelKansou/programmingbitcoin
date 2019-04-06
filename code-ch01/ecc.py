@@ -18,53 +18,74 @@ class FieldElement:
     def __eq__(self, other):
         if other is None:
             return False
-        return self.num == other.num and self.prime == other.prime  # <3>
+        return self.num == other.num and self.prime == other.prime
     # end::source1[]
 
     def __ne__(self, other):
-        # this should be the inverse of the == operator
-        raise NotImplementedError
+        if other is None:
+            return False
+        return self.num != other.num or self.prime != other.prime
 
     # tag::source2[]
     def __add__(self, other):
-        if self.prime != other.prime:  # <1>
-            raise TypeError('Cannot add two numbers in different Fields')
-        num = (self.num + other.num) % self.prime  # <2>
-        return self.__class__(num, self.prime)  # <3>
+        if self.prime != other.prime:
+            raise TypeError('Cannot add two numbers in different fields')
+        num = (self.num + other.num) % self.prime
+        return self.__class__(num, self.prime)
     # end::source2[]
 
     def __sub__(self, other):
-        if self.prime != other.prime:
-            raise TypeError('Cannot subtract two numbers in different Fields')
         # self.num and other.num are the actual values
         # self.prime is what we need to mod against
         # We return an element of the same class
-        raise NotImplementedError
+        if self.prime != other.prime:
+            raise TypeError('Cannot sub two numbers in different fields')
+        num = (self.num - other.num) % self.prime
+        return self.__class__(num, self.prime)
 
     def __mul__(self, other):
         if self.prime != other.prime:
             raise TypeError('Cannot multiply two numbers in different Fields')
+        num = (self.num * other.num) % self.prime
+        return self.__class__(num, self.prime)
         # self.num and other.num are the actual values
         # self.prime is what we need to mod against
         # We return an element of the same class
-        raise NotImplementedError
 
     # tag::source3[]
     def __pow__(self, exponent):
-        n = exponent % (self.prime - 1)  # <1>
+        #n = exponent
+        #while n < 0:
+        #    n += self.prime - 1
+        n = exponent % (self.prime - 1)
         num = pow(self.num, n, self.prime)
         return self.__class__(num, self.prime)
     # end::source3[]
 
+    def __div__(self, other):
+        if self.prime != other.prime:
+            raise TypeError('Cannot divide two numbers in different Fields')
+        # use fermat's little theorem:
+        # self.num**(p-1) % p == 1
+                # this means:
+        # 1/n == pow(n, p-2, p)
+        # We return an element of the same class
+        other_result = pow(other.num, self.prime-2, self.prime)
+        num = (self.num * other_result) % self.prime
+        return self.__class__(num, self.prime)
+    
+    # __truediv__ not working with jupyter notebooks
     def __truediv__(self, other):
         if self.prime != other.prime:
             raise TypeError('Cannot divide two numbers in different Fields')
         # use fermat's little theorem:
         # self.num**(p-1) % p == 1
-        # this means:
+                # this means:
         # 1/n == pow(n, p-2, p)
         # We return an element of the same class
-        raise NotImplementedError
+        other_result = pow(other.num, self.prime-2, self.prime)
+        num = (self.num * other_result) % self.prime
+        return self.__class__(num, self.prime)
 
 
 class FieldElementTest(TestCase):
