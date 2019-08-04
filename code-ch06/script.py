@@ -40,10 +40,9 @@ class Script:
                 result.append(cmd.hex())
         return ' '.join(result)
 
-    # tag::source4[]
     def __add__(self, other):
-        return Script(self.cmds + other.cmds)  # <1>
-    # end::source4[]
+        # combine the command set to creat a new combined Script
+        return Script(self.cmds + other.cmds)
 
     # tag::source2[]
     @classmethod
