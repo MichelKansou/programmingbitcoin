@@ -22,14 +22,15 @@ class TxFetcher:
     @classmethod
     def get_url(cls, testnet=False):
         if testnet:
-            return 'http://testnet.programmingbitcoin.com'
+            return 'https://blockstream.info/testnet/api/'
         else:
-            return 'http://mainnet.programmingbitcoin.com'
+            return 'https://blockstream.info/api/'
 
     @classmethod
     def fetch(cls, tx_id, testnet=False, fresh=False):
+        print('fetch id ', tx_id)
         if fresh or (tx_id not in cls.cache):
-            url = '{}/tx/{}.hex'.format(cls.get_url(testnet), tx_id)
+            url = '{}/tx/{}/hex'.format(cls.get_url(testnet), tx_id)
             response = requests.get(url)
             try:
                 raw = bytes.fromhex(response.text.strip())
@@ -162,28 +163,52 @@ class Tx:
         signed for index input_index'''
         # start the serialization with version
         # use int_to_little_endian in 4 bytes
+        sig = int_to_little_endian(self.version, 4)
         # add how many inputs there are using encode_varint
+        sig += encode_varint(len(self.tx_ins))
         # loop through each input using enumerate, so we have the input index
+        for idx, tx_in in enumerate(self.tx_ins):
             # if the input index is the one we're signing
+            if idx == input_index:
             # the previous tx's ScriptPubkey is the ScriptSig
+                sig += TxIn(
+                                    tx_in.prev_tx,
+                                    tx_in.prev_index,
+                                    tx_in.script_pubkey(self.testnet),
+                                    tx_in.sequence).serialize()
+            else:
             # Otherwise, the ScriptSig is empty
+                sig += TxIn(
+                                        prev_tx=tx_in.prev_tx,
+                                        prev_index=tx_in.prev_index,
+                                        sequence=tx_in.sequence).serialize()
             # add the serialization of the input with the ScriptSig we want
         # add how many outputs there are using encode_varint
+        sig += encode_varint(len(self.tx_outs))
         # add the serialization of each output
+        for tx_out in self.tx_outs:
+            sig += TxOut(tx_out.amount, tx_out.script_pubkey).serialize()
         # add the locktime using int_to_little_endian in 4 bytes
+        sig += int_to_little_endian(self.locktime, 4)
         # add SIGHASH_ALL using int_to_little_endian in 4 bytes
+        sig += int_to_little_endian(1, 4)
         # hash256 the serialization
+        sig_hash = hash256(sig)
         # convert the result to an integer using int.from_bytes(x, 'big')
-        raise NotImplementedError
+        return int.from_bytes(sig_hash, 'big')
 
     def verify_input(self, input_index):
         '''Returns whether the input has a valid signature'''
         # get the relevant input
+        tx_in = self.tx_ins[input_index]
         # grab the previous ScriptPubKey
+        script_pubkey = tx_in.script_pubkey(testnet=self.testnet)
         # get the signature hash (z)
+        z = self.sig_hash(input_index)
         # combine the current ScriptSig and the previous ScriptPubKey
+        combine_script = tx_in.script_sig + script_pubkey
         # evaluate the combined script
-        raise NotImplementedError
+        return combine_script.evaluate(z)
 
     # tag::source2[]
     def verify(self):
@@ -198,13 +223,19 @@ class Tx:
 
     def sign_input(self, input_index, private_key):
         # get the signature hash (z)
+        z = self.sig_hash(input_index)
         # get der signature of z from private key
+        der = private_key.sign(z).der()
         # append the SIGHASH_ALL to der (use SIGHASH_ALL.to_bytes(1, 'big'))
-        # calculate the sec
+        sig = der + SIGHASH_ALL.to_bytes(1, 'big')
+        # calculate the public key in sec format
+        sec = private_key.point.sec()
         # initialize a new script with [sig, sec] as the cmds
+        script_sig = Script([sig, sec])
         # change input's script_sig to new script
+        self.tx_ins[input_index].script_sig = script_sig
         # return whether sig is valid using self.verify_input
-        raise NotImplementedError
+        return self.verify_input(input_index)
 
 
 class TxIn:
